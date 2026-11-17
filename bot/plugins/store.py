@@ -10,7 +10,7 @@ from pyrogram import filters
 from bot.client import FileStoreBot
 from bot.config import settings
 from bot.delivery import public_link
-from bot.ui import share_markup
+from bot.ui import NO_PREVIEW, share_markup
 from bot.utils import describe_link, extract_message_id, media_info, with_flood_retry
 
 log = logging.getLogger("kdrama.store")
@@ -99,7 +99,7 @@ async def _reply_link(message, client: FileStoreBot, token: str) -> None:
     body = f"<b>Stored</b>\n{url}"
     if link:
         body += f"\n\n{describe_link(link)}"
-    await message.reply_text(body, reply_markup=share_markup(url), disable_web_page_preview=True, quote=True)
+    await message.reply_text(body, reply_markup=share_markup(url), link_preview_options=NO_PREVIEW)
 
 
 @FileStoreBot.on_message(filters.private & ADMINS & MEDIA)
@@ -112,7 +112,7 @@ async def store_private(client: FileStoreBot, message):
         origin = await client.get_messages(client.db_channel.id, existing)
         token = await register_message(client, origin, message.from_user.id)
         if not token:
-            await message.reply_text("That database post is empty.", quote=True)
+            await message.reply_text("That database post is empty.")
             return
         await _reply_link(message, client, token)
         return
@@ -123,7 +123,6 @@ async def store_private(client: FileStoreBot, message):
         await message.reply_text(
             f"I could not post that into the database channel ({type(exc).__name__}). "
             "Check that the bot is an admin and can post messages.",
-            quote=True,
         )
         return
     token = await register_message(client, copied, message.from_user.id)
@@ -157,7 +156,7 @@ async def _flush_album(client: FileStoreBot, group_id: str, user_id: int) -> Non
         if token:
             stored_ids.append(copied.id)
     if not stored_ids:
-        await reply_to.reply_text("I could not store that album.", quote=True)
+        await reply_to.reply_text("I could not store that album.")
         return
     if len(stored_ids) == 1:
         existing = await client.db.files.find_one({"message_id": stored_ids[0]})
@@ -178,8 +177,7 @@ async def _flush_album(client: FileStoreBot, group_id: str, user_id: int) -> Non
     await reply_to.reply_text(
         f"<b>Album stored</b> ({len(stored_ids)} files)\n{url}\n\n{describe_link(batch)}",
         reply_markup=share_markup(url),
-        disable_web_page_preview=True,
-        quote=True,
+        link_preview_options=NO_PREVIEW,
     )
 
 
@@ -191,7 +189,7 @@ async def quick_link(client: FileStoreBot, message):
     origin = await client.get_messages(client.db_channel.id, msg_id)
     token = await register_message(client, origin, message.from_user.id)
     if not token:
-        await message.reply_text("That database post is empty.", quote=True)
+        await message.reply_text("That database post is empty.")
         return
     await _reply_link(message, client, token)
 

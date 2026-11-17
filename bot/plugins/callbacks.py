@@ -21,7 +21,7 @@ from bot.plugins.admin import (
 )
 from bot.plugins.search import render_page
 from bot.state import set_state
-from bot.ui import about_text, help_text, panel_markup, settings_markup, settings_text, welcome_markup
+from bot.ui import NO_PREVIEW, about_text, help_text, panel_markup, settings_markup, settings_text, welcome_markup
 from bot.utils import format_user_text, uptime_string
 
 log = logging.getLogger("kdrama.callbacks")
@@ -39,9 +39,9 @@ async def _show(message, text: str, markup: InlineKeyboardMarkup | None) -> None
         if message.photo or message.video or message.document or message.animation:
             await message.edit_caption(text, reply_markup=markup)
         else:
-            await message.edit_text(text, reply_markup=markup, disable_web_page_preview=True)
+            await message.edit_text(text, reply_markup=markup, link_preview_options=NO_PREVIEW)
     except Exception:
-        await message.reply_text(text, reply_markup=markup, disable_web_page_preview=True)
+        await message.reply_text(text, reply_markup=markup, link_preview_options=NO_PREVIEW)
 
 
 @FileStoreBot.on_callback_query()

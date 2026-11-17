@@ -9,7 +9,7 @@ from pyrogram import filters
 from bot.client import FileStoreBot
 from bot.config import settings
 from bot.delivery import complete_verification, deliver_token
-from bot.ui import welcome_markup
+from bot.ui import NO_PREVIEW, welcome_markup
 from bot.utils import format_user_text, uptime_string
 
 log = logging.getLogger("kdrama.start")
@@ -54,4 +54,4 @@ async def _welcome(client: FileStoreBot, message) -> None:
             return
         except Exception:
             log.warning("start picture could not be sent")
-    await message.reply_text(text, reply_markup=markup, disable_web_page_preview=True)
+    await message.reply_text(text, reply_markup=markup, link_preview_options=NO_PREVIEW)

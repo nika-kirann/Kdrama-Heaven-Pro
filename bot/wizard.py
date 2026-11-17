@@ -7,7 +7,7 @@ import html
 from bot.config import EDITABLE, is_admin, settings
 from bot.delivery import public_link
 from bot.state import get_state, pop_state, set_state
-from bot.ui import share_markup
+from bot.ui import NO_PREVIEW, share_markup
 from bot.utils import describe_link, extract_message_id, message_range, parse_limits
 
 
@@ -158,7 +158,7 @@ async def _send_link(message, username: str, link: dict) -> None:
     await message.reply_text(
         f"<b>Link ready</b>\n{url}\n\n{describe_link(link)}",
         reply_markup=share_markup(url),
-        disable_web_page_preview=True,
+        link_preview_options=NO_PREVIEW,
     )
 
 

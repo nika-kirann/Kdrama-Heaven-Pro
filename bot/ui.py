@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import html
 
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions
+
+# Kurigram 2.2.27 dropped disable_web_page_preview on Message.reply and Message.edit_text.
+NO_PREVIEW = LinkPreviewOptions(is_disabled=True)
 
 from bot.config import EDITABLE, settings
 from bot.utils import clip, human_duration

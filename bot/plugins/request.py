@@ -22,20 +22,19 @@ async def request_command(client: FileStoreBot, message):
     if not await gate_user(client, message):
         return
     if len(message.command) < 2:
-        await message.reply_text("Usage: /request <code>Drama title</code>", quote=True)
+        await message.reply_text("Usage: /request <code>Drama title</code>")
         return
     text = message.text.split(maxsplit=1)[1].strip()
     if len(text) < 2:
-        await message.reply_text("Tell me the title.", quote=True)
+        await message.reply_text("Tell me the title.")
         return
     since = utcnow() - timedelta(hours=1)
     if await client.db.recent_request_count(message.from_user.id, since) >= 3:
-        await message.reply_text("You can send 3 requests an hour.", quote=True)
+        await message.reply_text("You can send 3 requests an hour.")
         return
     doc = await client.db.add_request(message.from_user, text)
     await message.reply_text(
         f"Request saved.\nId: <code>{doc['_id']}</code>\nAn admin will see it.",
-        quote=True,
     )
     note = (
         "<b>New request</b>\n"
@@ -59,7 +58,7 @@ async def request_command(client: FileStoreBot, message):
 async def my_requests(client: FileStoreBot, message):
     rows = await client.db.user_requests(message.from_user.id)
     if not rows:
-        await message.reply_text("You have not requested anything yet.", quote=True)
+        await message.reply_text("You have not requested anything yet.")
         return
     lines = ["<b>Your requests</b>"]
     for doc in rows:
@@ -67,4 +66,4 @@ async def my_requests(client: FileStoreBot, message):
             f"• <code>{doc['_id']}</code> [{html.escape(doc.get('status') or '')}] "
             f"{html.escape(doc.get('text') or '')}"
         )
-    await message.reply_text("\n".join(lines), quote=True)
+    await message.reply_text("\n".join(lines))

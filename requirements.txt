@@ -1,4 +1,6 @@
 # Kurigram is a maintained Pyrogram fork and imports as `pyrogram`.
+# Pinned to 2.2.27: Message.reply/edit_text take link_preview_options, not
+# disable_web_page_preview, and reply() has no quote argument.
 # kuricrypt is its crypto extension. Upstream TgCrypto does not build against this fork.
 kurigram==2.2.27
 kuricrypt==0.1.2

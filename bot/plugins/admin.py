@@ -16,7 +16,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from bot.client import FileStoreBot
 from bot.config import is_owner, settings
 from bot.state import set_state
-from bot.ui import broadcast_markup, panel_markup, settings_markup, settings_text
+from bot.ui import NO_PREVIEW, broadcast_markup, panel_markup, settings_markup, settings_text
 from bot.utils import uptime_string, with_flood_retry
 from bot.wizard import apply_ban, apply_premium_text, apply_unban
 
@@ -54,12 +54,12 @@ def restart_markup() -> InlineKeyboardMarkup:
 @FileStoreBot.on_message(filters.private & ADMINS & filters.command("requests"))
 async def requests_command(client: FileStoreBot, message):
     text, markup = await render_requests(client)
-    await message.reply_text(text, reply_markup=markup, quote=True)
+    await message.reply_text(text, reply_markup=markup)
 
 
 @FileStoreBot.on_message(filters.private & ADMINS & filters.command(["stats", "users"]))
 async def stats_command(client: FileStoreBot, message):
-    wait = await message.reply_text("Collecting stats…", quote=True)
+    wait = await message.reply_text("Collecting stats…")
     await wait.edit_text(await render_stats(client))
 
 
@@ -68,7 +68,6 @@ async def panel_command(client: FileStoreBot, message):
     await message.reply_text(
         f"<b>Admin panel</b>\nSigned in as <code>{message.from_user.id}</code>.",
         reply_markup=panel_markup(),
-        quote=True,
     )
 
 
@@ -78,7 +77,7 @@ async def admins_command(_client: FileStoreBot, message):
     for admin_id in settings.admin_ids:
         mark = " (owner)" if admin_id == settings.owner_id else ""
         lines.append(f"• <code>{admin_id}</code>{mark}")
-    await message.reply_text("\n".join(lines), quote=True)
+    await message.reply_text("\n".join(lines))
 
 
 @FileStoreBot.on_message(filters.private & ADMINS & filters.command("settings"))
@@ -86,8 +85,7 @@ async def settings_command(client: FileStoreBot, message):
     await message.reply_text(
         settings_text(client.cfg),
         reply_markup=settings_markup(client.cfg),
-        quote=True,
-        disable_web_page_preview=True,
+        link_preview_options=NO_PREVIEW,
     )
 
 
@@ -95,11 +93,11 @@ async def settings_command(client: FileStoreBot, message):
 async def ban_command(client: FileStoreBot, message):
     if len(message.command) < 2:
         set_state(message.from_user.id, flow="ban")
-        await message.reply_text("Send the user id and an optional reason, or /cancel.", quote=True)
+        await message.reply_text("Send the user id and an optional reason, or /cancel.")
         return
     reason = message.text.split(maxsplit=2)[2] if len(message.command) > 2 else ""
     if not message.command[1].isdigit():
-        await message.reply_text("The user id has to be a number.", quote=True)
+        await message.reply_text("The user id has to be a number.")
         return
     await apply_ban(client, message, int(message.command[1]), reason)
 
@@ -108,10 +106,10 @@ async def ban_command(client: FileStoreBot, message):
 async def unban_command(client: FileStoreBot, message):
     if len(message.command) < 2:
         set_state(message.from_user.id, flow="unban")
-        await message.reply_text("Send the user id to unban, or /cancel.", quote=True)
+        await message.reply_text("Send the user id to unban, or /cancel.")
         return
     if not message.command[1].isdigit():
-        await message.reply_text("The user id has to be a number.", quote=True)
+        await message.reply_text("The user id has to be a number.")
         return
     await apply_unban(client, message, int(message.command[1]))
 
@@ -123,20 +121,19 @@ async def premium_command(client: FileStoreBot, message):
         await message.reply_text(
             "Send <code>add USER_ID [days]</code> or <code>del USER_ID</code>.\n"
             "Or send <code>list</code>. /cancel stops this.",
-            quote=True,
         )
         return
     if message.command[1].lower() == "list":
         people = await client.db.premium_users()
         if not people:
-            await message.reply_text("No premium users.", quote=True)
+            await message.reply_text("No premium users.")
             return
         lines = ["<b>Premium</b>"]
         for doc in people:
             until = doc.get("premium_until")
             when = "no expiry" if until is None else until.strftime("%Y-%m-%d")
             lines.append(f"• <code>{doc['_id']}</code> ({when})")
-        await message.reply_text("\n".join(lines), quote=True)
+        await message.reply_text("\n".join(lines))
         return
     await apply_premium_text(client, message, message.text.split(maxsplit=1)[1])
 
@@ -144,10 +141,10 @@ async def premium_command(client: FileStoreBot, message):
 @FileStoreBot.on_message(filters.private & ADMINS & filters.command("broadcast"))
 async def broadcast_command(client: FileStoreBot, message):
     if message.reply_to_message is None:
-        await message.reply_text("Reply to the message you want to broadcast, then send /broadcast.", quote=True)
+        await message.reply_text("Reply to the message you want to broadcast, then send /broadcast.")
         return
     if client.broadcasting:
-        await message.reply_text("A broadcast is already running.", quote=True)
+        await message.reply_text("A broadcast is already running.")
         return
     token = secrets.token_hex(4)
     client.broadcasts[token] = {
@@ -158,7 +155,6 @@ async def broadcast_command(client: FileStoreBot, message):
     await message.reply_text(
         "Send this message to every user who has not blocked the bot?",
         reply_markup=broadcast_markup(token),
-        quote=True,
     )
 
 

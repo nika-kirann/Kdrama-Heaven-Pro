@@ -8,7 +8,7 @@ from pyrogram import filters
 
 from bot.client import FileStoreBot
 from bot.config import is_admin, settings
-from bot.ui import help_text
+from bot.ui import NO_PREVIEW, help_text
 from bot.utils import aware, format_user_text, uptime_string, utcnow
 
 
@@ -16,14 +16,13 @@ from bot.utils import aware, format_user_text, uptime_string, utcnow
 async def help_command(_client: FileStoreBot, message):
     await message.reply_text(
         help_text(is_admin(message.from_user.id)),
-        quote=True,
-        disable_web_page_preview=True,
+        link_preview_options=NO_PREVIEW,
     )
 
 
 @FileStoreBot.on_message(filters.private & filters.command("id"))
 async def id_command(_client: FileStoreBot, message):
-    await message.reply_text(f"Your user id is <code>{message.from_user.id}</code>.", quote=True)
+    await message.reply_text(f"Your user id is <code>{message.from_user.id}</code>.")
 
 
 @FileStoreBot.on_message(filters.private & filters.command("me"))
@@ -47,14 +46,13 @@ async def me_command(client: FileStoreBot, message):
         f"Premium: <b>{premium_text}</b>\n"
         f"Link verification: <b>{verify_text}</b>\n"
         f"Banned: <b>{banned}</b>",
-        quote=True,
     )
 
 
 @FileStoreBot.on_message(filters.private & filters.command(["uptime", "ping"]))
 async def uptime_command(client: FileStoreBot, message):
     started = time.perf_counter()
-    probe = await message.reply_text("Checking…", quote=True)
+    probe = await message.reply_text("Checking…")
     elapsed = (time.perf_counter() - started) * 1000
     await probe.edit_text(
         "<b>Status</b>\n"
@@ -73,7 +71,6 @@ async def uptime_command(client: FileStoreBot, message):
 async def user_media(_client: FileStoreBot, message):
     await message.reply_text(
         "Only admins can store files. Open a link you were given, or use /search and /request.",
-        quote=True,
     )
 
 

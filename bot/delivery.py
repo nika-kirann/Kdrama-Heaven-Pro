@@ -9,7 +9,7 @@ from pyrogram.enums import ChatMemberStatus, ParseMode
 from pyrogram.errors import UserNotParticipant
 from bot.config import is_admin, settings
 from bot.shortener import shorten
-from bot.ui import again_markup, forcesub_markup, verify_markup
+from bot.ui import NO_PREVIEW, again_markup, forcesub_markup, verify_markup
 from bot.utils import (
     format_user_text,
     human_duration,
@@ -81,7 +81,7 @@ async def send_forcesub(client, chat_id: int, user, payload: str) -> None:
         chat_id,
         text,
         reply_markup=forcesub_markup(missing or client.force_channels, client.username, payload),
-        disable_web_page_preview=True,
+        link_preview_options=NO_PREVIEW,
     )
 
 
@@ -118,7 +118,7 @@ async def send_verification(client, chat_id: int, user_id: int, file_token: str)
         "Open the verification link, complete the page, and you will be returned here.\n"
         f"One pass lasts <b>{hours} hours</b>. Premium accounts skip this step.",
         reply_markup=verify_markup(short, settings.verify_tutorial),
-        disable_web_page_preview=True,
+        link_preview_options=NO_PREVIEW,
     )
 
 
