@@ -1,0 +1,3 @@
+"""Kdrama Heaven file-store bot."""
+
+__version__ = "1.0.0"

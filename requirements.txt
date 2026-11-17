@@ -1,0 +1,8 @@
+# Kurigram is a maintained Pyrogram fork and imports as `pyrogram`.
+# kuricrypt is its crypto extension. Upstream TgCrypto does not build against this fork.
+kurigram==2.2.27
+kuricrypt==0.1.2
+motor==3.7.1
+pymongo==4.20.0
+dnspython==2.9.2
+aiohttp==3.14.5
