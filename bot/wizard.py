@@ -8,7 +8,7 @@ from bot.config import EDITABLE, is_admin, settings
 from bot.delivery import public_link
 from bot.state import get_state, pop_state, set_state
 from bot.ui import NO_PREVIEW, share_markup
-from bot.utils import describe_link, extract_message_id, message_range, parse_limits
+from bot.utils import auto_delete_line, describe_link, extract_message_id, message_range, parse_limits
 
 
 async def handle_wizard(client, message) -> bool:
@@ -156,7 +156,8 @@ def _limits_prompt() -> str:
 async def _send_link(message, username: str, link: dict) -> None:
     url = public_link(username, link["_id"])
     await message.reply_text(
-        f"<b>Link ready</b>\n{url}\n\n{describe_link(link)}",
+        f"<b>Link ready</b>\n{url}\n\n{describe_link(link)}\n"
+        + auto_delete_line(int(client.cfg.get("file_auto_delete") or 0)),
         reply_markup=share_markup(url),
         link_preview_options=NO_PREVIEW,
     )

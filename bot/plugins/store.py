@@ -11,7 +11,7 @@ from bot.client import FileStoreBot
 from bot.config import settings
 from bot.delivery import public_link
 from bot.ui import NO_PREVIEW, share_markup
-from bot.utils import describe_link, extract_message_id, media_info, with_flood_retry
+from bot.utils import auto_delete_line, describe_link, extract_message_id, media_info, with_flood_retry
 
 log = logging.getLogger("kdrama.store")
 
@@ -99,6 +99,7 @@ async def _reply_link(message, client: FileStoreBot, token: str) -> None:
     body = f"<b>Stored</b>\n{url}"
     if link:
         body += f"\n\n{describe_link(link)}"
+    body += "\n" + auto_delete_line(int(client.cfg.get("file_auto_delete") or 0))
     await message.reply_text(body, reply_markup=share_markup(url), link_preview_options=NO_PREVIEW)
 
 
@@ -175,7 +176,8 @@ async def _flush_album(client: FileStoreBot, group_id: str, user_id: int) -> Non
     )
     url = public_link(client.username, batch["_id"])
     await reply_to.reply_text(
-        f"<b>Album stored</b> ({len(stored_ids)} files)\n{url}\n\n{describe_link(batch)}",
+        f"<b>Album stored</b> ({len(stored_ids)} files)\n{url}\n\n{describe_link(batch)}\n"
+        + auto_delete_line(int(client.cfg.get("file_auto_delete") or 0)),
         reply_markup=share_markup(url),
         link_preview_options=NO_PREVIEW,
     )

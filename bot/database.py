@@ -12,6 +12,30 @@ from pymongo.errors import DuplicateKeyError
 from bot.config import EDITABLE, Settings
 from bot.utils import aware, utcnow
 
+
+def apply_runtime(base: dict, stored: dict | None) -> dict:
+    """Overlay /settings values from MongoDB onto the environment defaults.
+
+    A stored ``file_auto_delete`` of ``0`` is intentional and turns the timer off,
+    even when ``FILE_AUTO_DELETE`` is set in the environment.
+    """
+    cfg = dict(base)
+    stored = stored or {}
+    for key in EDITABLE:
+        if key in stored and stored[key] is not None:
+            cfg[key] = stored[key]
+    cfg["file_auto_delete"] = int(cfg.get("file_auto_delete") or 0)
+    for flag in ("protect_content", "disable_channel_button", "shortener_enabled"):
+        cfg[flag] = bool(cfg.get(flag))
+    return cfg
+
+
+def autodelete_source(stored: dict | None) -> str:
+    stored = stored or {}
+    if "file_auto_delete" in stored and stored.get("file_auto_delete") is not None:
+        return "mongo"
+    return "env"
+
 log = logging.getLogger("kdrama.db")
 
 
@@ -49,6 +73,7 @@ class Database:
         await self.db.requests.create_index([("status", 1), ("created_at", -1)])
         await self.db.verifications.create_index("created_at", expireAfterSeconds=86_400)
         await self.db.join_requests.create_index([("chat_id", 1), ("user_id", 1)], unique=True)
+        await self.db.deletions.create_index("due_at")
 
     @property
     def users(self):
@@ -78,16 +103,30 @@ class Database:
     def join_requests(self):
         return self.db.join_requests
 
+    @property
+    def deletions(self):
+        return self.db.deletions
+
     async def load_config(self, settings: Settings) -> dict:
         doc = await self.runtime.find_one({"_id": "runtime"}) or {}
-        cfg = settings.overlay()
-        for key in EDITABLE:
-            if key in doc and doc[key] is not None:
-                cfg[key] = doc[key]
-        cfg["file_auto_delete"] = int(cfg.get("file_auto_delete") or 0)
-        for flag in ("protect_content", "disable_channel_button", "shortener_enabled"):
-            cfg[flag] = bool(cfg.get(flag))
-        return cfg
+        self.file_auto_delete_source = autodelete_source(doc)
+        return apply_runtime(settings.overlay(), doc)
+
+    async def add_deletion(self, doc: dict) -> dict:
+        if "_id" not in doc:
+            doc["_id"] = new_token("d")
+        await self.deletions.insert_one(doc)
+        return doc
+
+    async def pending_deletions(self) -> list[dict]:
+        cursor = self.deletions.find({})
+        return [doc async for doc in cursor]
+
+    async def mark_files_deleted(self, deletion_id: str) -> None:
+        await self.deletions.update_one({"_id": deletion_id}, {"$set": {"files_deleted": True}})
+
+    async def finish_deletion(self, deletion_id: str) -> None:
+        await self.deletions.delete_one({"_id": deletion_id})
 
     async def set_runtime(self, key: str, value) -> None:
         await self.runtime.update_one({"_id": "runtime"}, {"$set": {key: value}}, upsert=True)

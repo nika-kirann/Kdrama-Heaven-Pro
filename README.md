@@ -104,7 +104,7 @@ Set these in Koyeb (or a local `.env` loaded by your shell). `.env.example` list
 | `FORCE_SUB_CHANNELS` | no | empty | Comma-separated chat ids. Optional label: `-100123\|Updates`. `FORCE_SUB_CHANNEL` also works |
 | `FORCE_SUB_REQUEST_CHANNELS` | no | empty | Ids that use join requests. A pending request counts as joined |
 | `AUTO_APPROVE_JOIN` | no | `false` | Approve those join requests automatically |
-| `FILE_AUTO_DELETE` | no | `600` | Seconds before delivered files disappear. `0` disables. Max 7 days |
+| `FILE_AUTO_DELETE` | no | `600` | Seconds before a delivered copy disappears for every user, including admins. `0` disables it. A `/settings` value in MongoDB replaces this, and a stored `0` turns it off |
 | `PROTECT_CONTENT` | no | `false` | Block forward and save on delivered files |
 | `DISABLE_CHANNEL_BUTTON` | no | `false` | Do not attach the Share button on database-channel posts |
 | `START_MESSAGE` | no | built-in hello | Welcome HTML |
@@ -127,7 +127,9 @@ Set these in Koyeb (or a local `.env` loaded by your shell). `.env.example` list
 | `KEEP_ALIVE_URL` | no | empty | Optional URL to GET every 4 minutes. Leave empty on Koyeb |
 | `NEW_USER_LOG` | no | `true` | Log the first `/start` from each user |
 
-`/settings` writes message text and the toggles above into MongoDB and those values win over the environment until you change them again. Secrets are never edited from chat.
+`/settings` writes message text and the toggles above into MongoDB and those values win over the environment until you change them again. Secrets are never edited from chat. A saved `file_auto_delete` of `0` turns auto-delete off even when `FILE_AUTO_DELETE=600`. Startup logs say whether the timer came from the environment or from MongoDB. The store confirmation shows `Auto-delete: 10 min` or `Auto-delete: off`.
+
+Auto-delete applies to every recipient, including admins and the owner. Premium users skip it only when `PREMIUM_BYPASS_AUTODELETE` is true. Each pending deletion is stored in MongoDB with a due time and is resumed after a Koyeb restart. Telegram only lets a bot delete its own private messages for about 48 hours.
 
 Boolean values accept `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off`.
 
@@ -167,6 +169,8 @@ Checks that do not need Telegram:
 ```bash
 python -m compileall -q bot tests
 python tests/test_logic.py
+python tests/test_kurigram_api.py
+python tests/test_autodelete.py
 ```
 
 ## Notes for operators

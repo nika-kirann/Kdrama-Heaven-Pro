@@ -49,6 +49,30 @@ def human_size(num: int | None) -> str:
     return "0 B"
 
 
+def auto_delete_label(seconds: int) -> str:
+    """Human label for the delivery timer. ``0`` is ``off`` (``600`` is ``10 min``)."""
+    seconds = int(seconds or 0)
+    if seconds <= 0:
+        return "off"
+    minutes, sec = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    parts: list[str] = []
+    if days:
+        parts.append("1 day" if days == 1 else f"{days} days")
+    if hours:
+        parts.append("1 hour" if hours == 1 else f"{hours} hours")
+    if minutes:
+        parts.append(f"{minutes} min")
+    if sec and not days:
+        parts.append("1 sec" if sec == 1 else f"{sec} sec")
+    return " ".join(parts) or "off"
+
+
+def auto_delete_line(seconds: int) -> str:
+    return f"Auto-delete: <b>{auto_delete_label(seconds)}</b>"
+
+
 def human_duration(seconds: int) -> str:
     seconds = max(0, int(seconds))
     minutes, sec = divmod(seconds, 60)

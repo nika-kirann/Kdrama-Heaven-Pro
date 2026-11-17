@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import timedelta
+from html import escape
 
 from pyrogram.enums import ChatMemberStatus, ParseMode
 from pyrogram.errors import UserNotParticipant
 from bot.config import is_admin, settings
+from bot.database import new_token
 from bot.shortener import shorten
 from bot.ui import NO_PREVIEW, again_markup, forcesub_markup, verify_markup
 from bot.utils import (
+    aware,
+    auto_delete_label,
     format_user_text,
     human_duration,
     media_info,
@@ -98,8 +103,6 @@ async def needs_verification(client, user_id: int) -> bool:
 
 
 async def send_verification(client, chat_id: int, user_id: int, file_token: str) -> None:
-    from bot.database import new_token
-
     token = new_token("v")
     await client.db.save_verification(token, user_id, file_token)
     destination = f"https://t.me/{client.username}?start={token}"
@@ -222,8 +225,11 @@ async def deliver_token(client, user, chat_id: int, token: str, *, count_use: bo
         return
 
     delay = int(client.cfg.get("file_auto_delete") or 0)
-    premium_skip = settings.premium_bypass_autodelete and await client.db.is_premium(user.id)
-    if delay <= 0 or premium_skip or is_admin(user.id):
+    # Premium bypass is the only skip, and only when PREMIUM_BYPASS_AUTODELETE is on.
+    # Admins and the owner follow the same timer so a test from the owner account is real.
+    if settings.premium_bypass_autodelete and await client.db.is_premium(user.id):
+        return
+    if delay <= 0:
         return
 
     notice = format_user_text(
@@ -232,39 +238,104 @@ async def deliver_token(client, user, chat_id: int, token: str, *, count_use: bo
         extra={"time": human_duration(delay)},
     )
     warning = await client.send_message(chat_id, notice)
-    asyncio.create_task(
-        _delete_later(
-            client,
-            chat_id,
-            sent_ids,
-            warning.id,
-            token,
-            delay,
-            user,
-        )
-    )
-
-
-async def _delete_later(client, chat_id: int, message_ids: list[int], warning_id: int, token: str, delay: int, user) -> None:
+    doc = {
+        "_id": new_token("d"),
+        "chat_id": int(chat_id),
+        "message_ids": list(sent_ids),
+        "warning_id": int(warning.id),
+        "token": token,
+        "due_at": utcnow() + timedelta(seconds=delay),
+        "user_id": int(user.id),
+        "first_name": user.first_name or "",
+        "last_name": user.last_name or "",
+        "username": user.username,
+        "files_deleted": False,
+    }
     try:
-        await asyncio.sleep(delay)
-        targets = message_ids + [warning_id]
-        for offset in range(0, len(targets), 100):
-            chunk = targets[offset : offset + 100]
+        await client.db.add_deletion(doc)
+    except Exception:
+        log.exception("could not persist auto-delete; it will still run until this process stops")
+    asyncio.create_task(run_saved_deletion(client, doc))
 
-            async def _delete(chunk=chunk):
-                return await client.delete_messages(chat_id, chunk)
 
+def _user_from_deletion(doc: dict):
+    name = doc.get("first_name") or "there"
+    user_id = int(doc["user_id"])
+
+    class _User:
+        def __init__(self):
+            self.id = user_id
+            self.first_name = name
+            self.last_name = doc.get("last_name") or ""
+            self.username = doc.get("username")
+            self.mention = f'<a href="tg://user?id={user_id}">{escape(name)}</a>'
+
+    return _User()
+
+
+async def run_saved_deletion(client, doc: dict) -> None:
+    """Delete a delivered batch at ``due_at``. Safe to run again after a restart."""
+    try:
+        due = aware(doc.get("due_at")) or utcnow()
+        delay = max(0.0, (due - utcnow()).total_seconds())
+        if delay:
+            await asyncio.sleep(delay)
+        if not doc.get("files_deleted"):
+            targets = [int(i) for i in doc.get("message_ids") or []]
+            warning_id = doc.get("warning_id")
+            if warning_id:
+                targets.append(int(warning_id))
+            chat_id = int(doc["chat_id"])
+            for offset in range(0, len(targets), 100):
+                chunk = targets[offset : offset + 100]
+
+                async def _delete(chunk=chunk):
+                    return await client.delete_messages(chat_id, chunk)
+
+                try:
+                    await with_flood_retry(_delete)
+                except Exception:
+                    log.warning("auto-delete failed in %s", chat_id, exc_info=True)
+                    return
+            doc["files_deleted"] = True
             try:
-                await with_flood_retry(_delete)
+                await client.db.mark_files_deleted(doc["_id"])
             except Exception:
-                log.warning("auto-delete failed in %s", chat_id, exc_info=True)
+                log.exception("could not mark auto-delete %s", doc.get("_id"))
+        user = _user_from_deletion(doc)
         text = format_user_text(client.cfg.get("auto_delete_text") or "Files deleted.", user)
-        await client.send_message(chat_id, text, reply_markup=again_markup(token))
+        await client.send_message(int(doc["chat_id"]), text, reply_markup=again_markup(doc["token"]))
+        try:
+            await client.db.finish_deletion(doc["_id"])
+        except Exception:
+            log.exception("could not clear auto-delete %s", doc.get("_id"))
     except asyncio.CancelledError:
-        return
+        raise
     except Exception:
         log.exception("auto-delete task failed")
+
+
+async def resume_autodeletes(client) -> None:
+    """Restart timers that were still pending when the process stopped."""
+    try:
+        pending = await client.db.pending_deletions()
+    except Exception:
+        log.exception("could not load pending auto-deletes")
+        return
+    now = utcnow()
+    overdue = 0
+    for doc in pending:
+        due = aware(doc.get("due_at"))
+        if due is not None and due <= now:
+            overdue += 1
+        asyncio.create_task(run_saved_deletion(client, doc))
+    if pending:
+        log.info(
+            "resumed %s auto-delete timer(s), %s already due (%s)",
+            len(pending),
+            overdue,
+            auto_delete_label(int(client.cfg.get("file_auto_delete") or 0)),
+        )
 
 
 def _status_text(status: str) -> str:

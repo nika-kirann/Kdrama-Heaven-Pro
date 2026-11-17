@@ -12,8 +12,9 @@ from pyrogram.types import BotCommand, BotCommandScopeChat
 
 from bot.config import settings
 from bot.database import Database
+from bot.delivery import resume_autodeletes
 from bot.health import set_bot_status
-from bot.utils import RateLimiter, utcnow
+from bot.utils import RateLimiter, auto_delete_label, utcnow
 
 log = logging.getLogger("kdrama")
 
@@ -110,9 +111,18 @@ class FileStoreBot(Client):
 
         self.force_channels = await self._load_forcesub()
         self.cfg = await self.db.load_config(settings)
+        self.file_auto_delete_source = getattr(self.db, "file_auto_delete_source", "env")
         self.banned = set(await self.db.banned_ids())
+        seconds = int(self.cfg.get("file_auto_delete") or 0)
+        log.info(
+            "Auto-delete: %s (source: %s, FILE_AUTO_DELETE=%s). Admins are not exempt.",
+            auto_delete_label(seconds),
+            "MongoDB /settings" if self.file_auto_delete_source == "mongo" else "FILE_AUTO_DELETE",
+            settings.file_auto_delete,
+        )
         await self._install_commands()
         await self._announce()
+        await resume_autodeletes(self)
         if settings.keep_alive_url:
             asyncio.create_task(self._keep_alive())
         set_bot_status("ready")
@@ -184,12 +194,21 @@ class FileStoreBot(Client):
                 )
 
     async def _announce(self) -> None:
+        seconds = int(self.cfg.get("file_auto_delete") or 0)
+        if self.file_auto_delete_source == "mongo":
+            timer = (
+                f"Auto-delete: {auto_delete_label(seconds)} "
+                f"(MongoDB /settings overrides FILE_AUTO_DELETE={settings.file_auto_delete})"
+            )
+        else:
+            timer = f"Auto-delete: {auto_delete_label(seconds)} (FILE_AUTO_DELETE)"
         text = (
             "<b>Bot started</b>\n"
             f"Username: @{self.username}\n"
             f"Database channel: <code>{self.db_channel.id}</code>\n"
             f"Force-sub channels: {len(self.force_channels)}\n"
-            f"Admins: {len(settings.admin_ids)}"
+            f"Admins: {len(settings.admin_ids)}\n"
+            f"{timer}"
         )
         try:
             await self.send_message(settings.log_channel, text)
